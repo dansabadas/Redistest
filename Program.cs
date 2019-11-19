@@ -13,7 +13,7 @@ namespace Redistest
         {
             string cacheConnection = Configuration[SecretName];
             cacheConnection = "danson.redis.cache.windows.net,abortConnect=false,ssl=true,password=QSBiha8+aGikk56uTZ16x6n9UlrWdM6azQLSHoYuO5Q=";
-            cacheConnection = "clj-lc-qa-snt01:26379,abortConnect=false,ssl=true,password=PASS1234";
+            //cacheConnection = "clj-lc-qa-snt01:26379,abortConnect=false,ssl=true,password=PASS1234";
 
             return ConnectionMultiplexer.Connect(cacheConnection);
         });
