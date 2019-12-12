@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using StackExchange.Redis;
 
@@ -11,8 +12,7 @@ namespace Redistest
     {
         private static Lazy<ConnectionMultiplexer> __lazyConnection = new Lazy<ConnectionMultiplexer>(() =>
         {
-            string cacheConnection = Configuration[SecretName];
-            cacheConnection = "danson.redis.cache.windows.net,abortConnect=false,ssl=true,password=QSBiha8+aGikk56uTZ16x6n9UlrWdM6azQLSHoYuO5Q=";
+            var cacheConnection = "danson.redis.cache.windows.net,abortConnect=false,ssl=true,password=QSBiha8+aGikk56uTZ16x6n9UlrWdM6azQLSHoYuO5Q=";
             //cacheConnection = "clj-lc-qa-snt01:26379,serviceName=lc-redis,abortConnect=true,ssl=true,password=PASS1234";//26380 clj-lc-qa-snt01:26379 lc-redis
             //cacheConnection = "clj-lc-qa-snt01:26380,serviceName=cc-redis,syncTimeout=5000,password=PASS1234";
 
@@ -82,18 +82,33 @@ namespace Redistest
                 var teams = Employee.Seed();
                 cache.StringSet("teamsList", JsonConvert.SerializeObject(teams));
 
-                Parallel.For(0, 3, i =>
-                {
-                    cache.LockTake("teamsList", Guid.Empty.ToString(), TimeSpan.FromMilliseconds(3000));
-                    serializedTeams = cache.StringGet("teamsList");
-                    teams = JsonConvert.DeserializeObject<List<Employee>>(serializedTeams);
-                    Employee.PlayGames(teams);
-                    cache.LockRelease("teamsList", Guid.Empty.ToString());
-                });
+                //Parallel.For(0, 3, i =>
+                //{
+                //    cache.LockTake("teamsList", Guid.Empty.ToString(), TimeSpan.FromMilliseconds(30000));
+                //    serializedTeams = cache.StringGet("teamsList");
+                //    Console.WriteLine($"locked teamsList {serializedTeams}");
+                //    teams = JsonConvert.DeserializeObject<List<Employee>>(serializedTeams);
+                //    Employee.PlayGames(teams);
+                //    teams.RemoveAll(e => e.Id == 1);
+                //    serializedTeams = JsonConvert.SerializeObject(teams);
+                //    cache.StringSet("teamsList", serializedTeams);
+                //    cache.LockRelease("teamsList", Guid.Empty.ToString());
+                //});
+
+
+                cache.LockTake("teamsList", Guid.Empty.ToString(), TimeSpan.FromMilliseconds(30000));
+                Console.WriteLine($"lock taken by {Process.GetCurrentProcess().Id}");
+                Thread.Sleep(10000);
+                serializedTeams = cache.StringGet("teamsList");
+                Console.WriteLine($"locked teamsList {serializedTeams}");
+                teams = JsonConvert.DeserializeObject<List<Employee>>(serializedTeams);
+                Employee.PlayGames(teams);
+                teams.RemoveAll(e => e.Id == 1);
+                serializedTeams = JsonConvert.SerializeObject(teams);
+                cache.StringSet("teamsList", serializedTeams);
+                Console.WriteLine($"lock released by {Process.GetCurrentProcess().Id}");
+                cache.LockRelease("teamsList", Guid.Empty.ToString());
             }
         }
-
-        private static IConfigurationRoot Configuration { get; } = new ConfigurationBuilder().AddUserSecrets<Program>().Build();
-        private const string SecretName = "CacheConnection";
     }
 }
