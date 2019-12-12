@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -16,7 +17,49 @@ namespace Redistest
             //cacheConnection = "clj-lc-qa-snt01:26379,serviceName=lc-redis,abortConnect=true,ssl=true,password=PASS1234";//26380 clj-lc-qa-snt01:26379 lc-redis
             //cacheConnection = "clj-lc-qa-snt01:26380,serviceName=cc-redis,syncTimeout=5000,password=PASS1234";
 
-            return ConnectionMultiplexer.Connect(cacheConnection);
+            //return ConnectionMultiplexer.Connect(cacheConnection);
+
+            var options = new ConfigurationOptions()
+            {
+                CommandMap = CommandMap.Sentinel,
+                EndPoints = { { "clj-lc-qa-snt01", 26379 } },
+                AllowAdmin = true,
+                TieBreaker = "",
+                ServiceName = "lc-redis",
+                SyncTimeout = 5000,
+                //Password= "PASS1234",
+            };
+
+
+
+            //reference page for Sentinel: https://redis.io/topics/sentinel
+
+
+
+            var connection = ConnectionMultiplexer.Connect(options);
+            //need to get the master node
+            // option 1:
+            IDatabase cache = connection.GetDatabase();
+            //RedisResult[] result = (RedisResult[])cache.Execute("SENTINEL", "get-master-addr-by-name", "lc-redis");
+            //Console.WriteLine($"Cache response : {result[0]}:{result[1]}");
+            //connection.GetSubscriber().Subscribe()
+
+
+
+            //option 2:
+            var masters = connection.GetServer("clj-lc-qa-snt01", 26379).SentinelMasters();
+
+            options = new ConfigurationOptions()
+            {
+                EndPoints = { { masters.First().Single(x => x.Key == "ip").Value, int.Parse(masters.First().Single(x => x.Key == "port").Value) } },
+                AllowAdmin = true,
+                TieBreaker = "",
+                ServiceName = "lc-redis",
+                SyncTimeout = 5000,
+                Password = "PASS1234",
+            };
+            connection = ConnectionMultiplexer.Connect(options);
+            return connection;
         });
 
         static void Main()
