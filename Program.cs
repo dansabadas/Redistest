@@ -62,56 +62,56 @@ namespace Redistest
             return connection;
         });
 
-        static void Main()
+        static async Task Main()
         {
             using (var multiplexer = __lazyConnection.Value)
             {
-                IDatabase cache = multiplexer.GetDatabase();
+                IDatabase redisDatabase = multiplexer.GetDatabase();
 
                 // Perform cache operations using the cache object...
 
                 // Simple PING command
                 string cacheCommand = "PING";
                 Console.WriteLine($"\nCache command  : {cacheCommand}");
-                Console.WriteLine($"Cache response : {cache.Execute(cacheCommand)}");
+                Console.WriteLine($"Cache response : {redisDatabase.Execute(cacheCommand)}");
 
                 // Simple get and put of integral data types into the cache
                 cacheCommand = "GET Message";
                 Console.WriteLine($"\nCache command  : {cacheCommand} or StringGet()");
-                Console.WriteLine($"Cache response : {cache.StringGet("Message")}");
+                Console.WriteLine($"Cache response : {redisDatabase.StringGet("Message")}");
 
                 cacheCommand = "SET Message \"Hello! The cache is working from a .NET Core console app!\"";
                 Console.WriteLine($"\nCache command  : {cacheCommand} or StringSet()");
                 Console.WriteLine(
-                    $"Cache response : {cache.StringSet("Message", "Hello! The cache is working from a .NET Core console app!")}");
+                    $"Cache response : {redisDatabase.StringSet("Message", "Hello! The cache is working from a .NET Core console app!")}");
 
                 // Demonstrate "SET Message" executed as expected...
                 cacheCommand = "GET Message";
                 Console.WriteLine($"\nCache command  : {cacheCommand} or StringGet()");
-                Console.WriteLine($"Cache response : {cache.StringGet("Message")}");
+                Console.WriteLine($"Cache response : {redisDatabase.StringGet("Message")}");
 
                 // Get the client list, useful to see if connection list is growing...
                 cacheCommand = "CLIENT LIST";
                 Console.WriteLine($"\nCache command  : {cacheCommand}");
                 Console.WriteLine(
-                    $"Cache response : \n{cache.Execute("CLIENT", "LIST").ToString().Replace("id=", "id=")}");
+                    $"Cache response : \n{redisDatabase.Execute("CLIENT", "LIST").ToString().Replace("id=", "id=")}");
 
                 // Store .NET object to cache
-                var gotIt = cache.StringGet("e007");
+                var gotIt = redisDatabase.StringGet("e007");
                 if (!gotIt.IsNull)
                 {
-                    Console.WriteLine("cache.KeyDelete : " + cache.KeyDelete("e007"));
+                    Console.WriteLine("cache.KeyDelete : " + redisDatabase.KeyDelete("e007"));
                 }
 
                 Employee e007 = new Employee(7, "Davide Columbo", 100);
                 Console.WriteLine("Cache response from storing Employee .NET object : " +
-                                  cache.StringSet("e007", JsonConvert.SerializeObject(e007)));
+                                  redisDatabase.StringSet("e007", JsonConvert.SerializeObject(e007)));
 
                 // Retrieve .NET object from cache
-                gotIt = cache.StringGet("e008");
+                gotIt = redisDatabase.StringGet("e008");
                 if (gotIt.IsNull)
                 {
-                    gotIt = cache.StringGet("e007");
+                    gotIt = redisDatabase.StringGet("e007");
                 }
 
                 var e007FromCache = JsonConvert.DeserializeObject<Employee>(gotIt);
@@ -120,10 +120,10 @@ namespace Redistest
                 Console.WriteLine("\tEmployee.Id   : " + e007FromCache.Id);
                 Console.WriteLine("\tEmployee.Age  : " + e007FromCache.Age + "\n");
 
-                string serializedTeams = cache.StringGet("teamsList");
+                string serializedTeams = redisDatabase.StringGet("teamsList");
                 Console.WriteLine($"serializedTeams={serializedTeams}");
                 var teams = Employee.Seed();
-                cache.StringSet("teamsList", JsonConvert.SerializeObject(teams));
+                redisDatabase.StringSet("teamsList", JsonConvert.SerializeObject(teams));
 
                 //Parallel.For(0, 3, i =>
                 //{
@@ -139,18 +139,18 @@ namespace Redistest
                 //});
 
 
-                cache.LockTake("teamsList", Guid.Empty.ToString(), TimeSpan.FromMilliseconds(30000));
+                await redisDatabase.LockTakeAsync("teamsList", Guid.Empty.ToString(), TimeSpan.FromMilliseconds(30000));
                 Console.WriteLine($"lock taken by {Process.GetCurrentProcess().Id}");
                 Thread.Sleep(10000);
-                serializedTeams = cache.StringGet("teamsList");
+                serializedTeams = redisDatabase.StringGet("teamsList");
                 Console.WriteLine($"locked teamsList {serializedTeams}");
                 teams = JsonConvert.DeserializeObject<List<Employee>>(serializedTeams);
                 Employee.PlayGames(teams);
                 teams.RemoveAll(e => e.Id == 1);
                 serializedTeams = JsonConvert.SerializeObject(teams);
-                cache.StringSet("teamsList", serializedTeams);
+                redisDatabase.StringSet("teamsList", serializedTeams);
                 Console.WriteLine($"lock released by {Process.GetCurrentProcess().Id}");
-                cache.LockRelease("teamsList", Guid.Empty.ToString());
+                await redisDatabase.LockReleaseAsync("teamsList", Guid.Empty.ToString());
             }
         }
     }
