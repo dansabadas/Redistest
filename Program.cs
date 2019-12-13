@@ -24,41 +24,30 @@ namespace Redistest
                 CommandMap = CommandMap.Sentinel,
                 EndPoints = { { "clj-lc-qa-snt01", 26379 } },
                 AllowAdmin = true,
-                TieBreaker = "",
+                TieBreaker = string.Empty,
                 ServiceName = "lc-redis",
                 SyncTimeout = 5000,
-                //Password= "PASS1234",
             };
 
+            var master = ConnectionMultiplexer
+                .Connect(options)
+                .GetServer("clj-lc-qa-snt01", 26379)
+                .SentinelMasters()
+                .First();
 
-
-            //reference page for Sentinel: https://redis.io/topics/sentinel
-
-
-
-            var connection = ConnectionMultiplexer.Connect(options);
-            //need to get the master node
-            // option 1:
-            IDatabase cache = connection.GetDatabase();
-            //RedisResult[] result = (RedisResult[])cache.Execute("SENTINEL", "get-master-addr-by-name", "lc-redis");
-            //Console.WriteLine($"Cache response : {result[0]}:{result[1]}");
-            //connection.GetSubscriber().Subscribe()
-
-
-
-            //option 2:
-            var masters = connection.GetServer("clj-lc-qa-snt01", 26379).SentinelMasters();
+            //options.EndPoints = { { master.Single(x => x.Key == "ip").Value, int.Parse(master.Single(x => x.Key == "port").Value) } };
 
             options = new ConfigurationOptions()
             {
-                EndPoints = { { masters.First().Single(x => x.Key == "ip").Value, int.Parse(masters.First().Single(x => x.Key == "port").Value) } },
+                EndPoints = { { master.Single(x => x.Key == "ip").Value, int.Parse(master.Single(x => x.Key == "port").Value) } },
                 AllowAdmin = true,
-                TieBreaker = "",
+                TieBreaker = string.Empty,
                 ServiceName = "lc-redis",
                 SyncTimeout = 5000,
                 Password = "PASS1234",
             };
-            connection = ConnectionMultiplexer.Connect(options);
+
+            var connection = ConnectionMultiplexer.Connect(options);
             return connection;
         });
 
