@@ -138,10 +138,17 @@ namespace Redistest
                 //    cache.LockRelease("teamsList", Guid.Empty.ToString());
                 //});
 
-
-                await redisDatabase.LockTakeAsync("teamsList", Guid.Empty.ToString(), TimeSpan.FromMilliseconds(30000));
-                Console.WriteLine($"lock taken by {Process.GetCurrentProcess().Id}");
-                Thread.Sleep(10000);
+                var pid = Process.GetCurrentProcess().Id.ToString();
+                var emptyId = Guid.Empty.ToString();
+                var lockTaken = await redisDatabase.LockTakeAsync("teamsList", emptyId, TimeSpan.FromMilliseconds(30000));
+                while (!lockTaken)
+                {
+                    Console.WriteLine($"lock not yet taken by {pid}");
+                    Thread.Sleep(2000);
+                    lockTaken = await redisDatabase.LockTakeAsync("teamsList", emptyId, TimeSpan.FromMilliseconds(30000));
+                }
+                Thread.Sleep(2000);
+                Console.WriteLine($"lock taken by {pid}");
                 serializedTeams = redisDatabase.StringGet("teamsList");
                 Console.WriteLine($"locked teamsList {serializedTeams}");
                 teams = JsonConvert.DeserializeObject<List<Employee>>(serializedTeams);
@@ -149,8 +156,10 @@ namespace Redistest
                 teams.RemoveAll(e => e.Id == 1);
                 serializedTeams = JsonConvert.SerializeObject(teams);
                 redisDatabase.StringSet("teamsList", serializedTeams);
-                Console.WriteLine($"lock released by {Process.GetCurrentProcess().Id}");
+                Console.WriteLine($"lock released by {pid}");
                 await redisDatabase.LockReleaseAsync("teamsList", Guid.Empty.ToString());
+
+                redisDatabase.KeyExpire("teamsList", DateTime.UtcNow.AddMinutes(5));
             }
         }
     }
